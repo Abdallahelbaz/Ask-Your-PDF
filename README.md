@@ -8,7 +8,7 @@ This repository contains the implementation of a Retrieval-Augmented Generation 
 
 #### Install Python using MiniConda
 
-1) Download and install MiniConda from [here] (https://www.anaconda.com/docs/getting-started/miniconda/main#quick-command-line-install)
+1) Download and install MiniConda from [here] ( https://www.anaconda.com/docs/getting-started/miniconda/main#quick-command-line-install )
 2) create Environment using the Following command:
 ```bash
 $ conda create -n ask-your-pdf python= 3.8
@@ -19,3 +19,7 @@ $ conda activate ask-your-pdf
 ```
 
 
+### (Optional) To write your commands in a new line:
+```bash
+$ export PS1="\[\033[01;32m\]\u@\h:\w\n\[\033[00m\]\$ "
+```
