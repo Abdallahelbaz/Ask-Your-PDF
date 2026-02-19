@@ -1,0 +1,20 @@
+services:
+    mongodb:
+        #from mogotags choose any one
+        image: mongo:latest
+        
+        container_name: mongodb
+        
+        ports:
+        # this is the default port 27017, move to another port 27007
+            - "27007:27017"
+        volumes:
+        # where to write the data
+            - "./mongodb:/data/db"
+        networks:
+            - backend
+        # if it fails, then restart
+        restart: always
+
+networks:
+    backend:z
