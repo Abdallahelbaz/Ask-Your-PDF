@@ -23,7 +23,7 @@ log=logging.getLogger('uvicorn.error')
 async def upload_file(project_id: str, request: Request,
                        file: UploadFile,settings:Settings = Depends(get_settings)):
     
-    project_model= ProjectModel(
+    project_model= await ProjectModel.create_instance(
         request.app.mongo_client
     )
 
@@ -75,10 +75,10 @@ async def data_processing(project_id: str, process_request: ProcessRequest, requ
     overlap_size= process_request.overlap_size
     do_reset=process_request.do_reset
 
-    project_model= ProjectModel(
+    project_model= await ProjectModel.create_instance(
         request.app.mongo_client
     )
-    chunk_model= ChunkModel(
+    chunk_model= await ChunkModel.create_instance(
         request.app.mongo_client
     )
 

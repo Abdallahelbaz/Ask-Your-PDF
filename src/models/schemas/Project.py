@@ -13,3 +13,21 @@ class Project(BaseModel):
     # pydantic can't understand type of: ObjectId, so we add this part of code to be able to deal with it
     class Config:
         arbitrary_types_allowed=True
+
+
+    # this for static method
+    @classmethod
+    def get_indexes(cls):
+        return [
+            {   
+                # attribute that i want to index
+                "key": [
+                    # asc = 1, dec = -1 
+                    ("project_id", 1)
+                ],
+                # unique name for the index
+                "name": "project_id_index_1",
+                # ask whether all values of this index are unique or not
+                "unique": True
+            }
+        ]

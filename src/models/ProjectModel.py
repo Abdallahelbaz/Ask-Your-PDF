@@ -7,6 +7,30 @@ class ProjectModel(BaseData):
     def __init__(self, client: object):
         super().__init__(client)
         self.collection= self.client[DatabaseEnum.COLLECTION_PROJECT.value]
+    
+
+    # init_collection is a async method, so we should call it with await, 
+    # we can't call async method in __init__ 
+    # so we make this method to call __init__ and init_collection
+    @classmethod
+    async def create_instance(cls, client: object):
+        instance= cls(client)
+        await instance.init_collection()
+        return instance
+
+    # create Index
+    async def init_collection(self):
+        # see first if the collection available or not, if not, create indexes
+        all_coll= await self.client.list_collection_names()
+        if DatabaseEnum.COLLECTION_PROJECT.value not in all_coll:
+            self.collection= self.client[DatabaseEnum.COLLECTION_PROJECT.value]
+            indexes= Project.get_indexes()
+            for index in indexes:
+                await self.collection.create_index(
+                    index["key"],
+                    name=index["name"],
+                    unique=index["unique"]
+                )
 
     log=logging.getLogger('uvicorn.error')
     
