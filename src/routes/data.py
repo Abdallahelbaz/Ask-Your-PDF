@@ -9,8 +9,9 @@ import logging
 from .schemas.data import ProcessRequest
 from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
-from models.schemas.Chunk import Chunk
-
+from models.AssetModel import AssetModel
+from models.schemas import Chunk, Asset
+from models.enums.AssetTypeEnum import AssetTypeEnum
 
 data_rounter= APIRouter(
     prefix="/api/v1/data", 
@@ -59,11 +60,23 @@ async def upload_file(project_id: str, request: Request,
             }
         )
     
-    
+    asset_model= await AssetModel.create_instance(
+         request.app.mongo_client
+    )
+
+    resource= Asset(
+         asset_project_id=project.id,
+         asset_type=AssetTypeEnum.FILE.value,
+         asset_name=file_id,
+         asset_size= os.path.getsize(file_path),
+    )
+
+    asset_record= await asset_model.create_asset(resource)
+
     return JSONResponse (
             content={
                 "Signal": ResponseEnum.FILE_UPLOADED_SUCCESSFULLY.value,
-                "file_id": file_id,
+                "file_id": str(asset_record.id),
 
             }
         )

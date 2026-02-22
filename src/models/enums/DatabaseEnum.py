@@ -4,3 +4,4 @@ class DatabaseEnum(Enum):
 
     COLLECTION_PROJECT="projects"
     COLLECTION_CHUNKS="chunks"
+    COLLECTION_ASSETS="assets"
