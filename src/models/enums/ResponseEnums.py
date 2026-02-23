@@ -10,3 +10,4 @@ class ResponseEnum(Enum):
     FILE_VALIDATED_FAILED="File Validation Failed"
     PROCESSING_FAILED="Failed Processing"
     PROCESSING_SUCCESS="Processing Success"
+    NO_FILES_SIGNAL="There are no files!"

@@ -9,6 +9,7 @@ class Chunk(BaseModel):
     chunk_project_id: ObjectId
     # greater than
     chunk_order: int= Field(..., gt=0)
+    chunk_asset_id: ObjectId
 
     class Config:
         arbitrary_types_allowed=True

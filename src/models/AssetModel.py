@@ -35,8 +35,28 @@ class AssetModel(BaseData):
         return asset
     
 
-    async def get_all_project_assets(self, asset_project_id):
-        return await self.collection.finid({
-            "asset_project_id": ObjectId(asset_project_id) if isinstance(asset_project_id, str) else asset_project_id
+    async def get_all_project_assets(self, asset_project_id: str, asset_type: str):
+        
+        records= await self.collection.find({
+            "asset_project_id": ObjectId(asset_project_id) if isinstance(asset_project_id, str) else asset_project_id,
+            "asset_type": asset_type
             # if i need all, i write None, length=10
         }).to_list(length=None)
+
+
+        return [
+            Asset(**record)
+            for record in records
+        ]
+    
+    async def get_asset_record(self, asset_project_id: str, asset_name: str):
+        record= await self.collection.find_one({
+            "asset_project_id": ObjectId(asset_project_id) if isinstance(asset_project_id, str) else asset_project_id,
+            "asset_name": asset_name
+        })
+
+        if record:
+            return Asset(**record)
+        
+        return None
+    
