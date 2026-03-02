@@ -174,7 +174,6 @@ async def data_processing(project_id: str, process_request: ProcessRequest, requ
 
     
 
-
     return JSONResponse (
             content={
                 "Signal": ResponseEnum.PROCESSING_SUCCESS.value,

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from bson.objectid import ObjectId
 
 class Chunk(BaseModel):
@@ -25,3 +25,8 @@ class Chunk(BaseModel):
                 "unique": False
             }
         ]
+
+class RetrievedDocument(BaseModel):
+    text:str
+    score:float
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)

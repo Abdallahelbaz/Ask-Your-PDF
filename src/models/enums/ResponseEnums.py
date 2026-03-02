@@ -11,3 +11,8 @@ class ResponseEnum(Enum):
     PROCESSING_FAILED="Failed Processing"
     PROCESSING_SUCCESS="Processing Success"
     NO_FILES_SIGNAL="There are no files!"
+    PROJECT_NOT_FOUND="Project Not Found!"
+    INSERT_INTO_VECTORDB_ERROR="Insert Into VectorDB Error"
+    INSERT_INTO_VECTORDB_SUCCESS="Insertion Successfull"
+    VECTORDB_COLLECTION_INFO="VectorDB Collection info retrieved"
+    VECTORDB_SEARCH_INFO="Hier is the search info"

@@ -51,10 +51,10 @@ class ChunkModel(BaseData):
 
     # if we have too many chunks, and we inserted it as a one batch, may it causes a problem with the data base
     # so insert them batch by batch
-    async def insert_many(self, chunks: list, batch: int =100):
+    async def insert_many(self, chunks: list, batch_size: int =100):
 
-        for i in range(0, len(chunks), batch):
-            batch= chunks [i: i + batch]
+        for i in range(0, len(chunks), batch_size):
+            batch= chunks [i: i + batch_size]
 
             operations=[
                 InsertOne(chunk.model_dump(by_alias=True, exclude_unset=True))
@@ -72,3 +72,17 @@ class ChunkModel(BaseData):
         })
 
         return result.deleted_count
+    
+    async def get_project_chunks(self,project_id: ObjectId, page_no: int=1, page_size:int=50):
+        results=await self.collection.find(
+            {
+                "chunk_project_id":project_id
+            }
+        ).skip(
+            (page_no-1) * page_size
+        ).limit(page_size).to_list(length=None)
+
+        return [
+            Chunk(**r)
+            for r in results
+        ]

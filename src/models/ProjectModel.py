@@ -49,7 +49,7 @@ class ProjectModel(BaseData):
         value= await self.collection.find_one({
             "project_id": project_id
         })
-        self.log.error(f"I'm in get_or_create_project {value}")
+
         if value is None:
             project= Project(project_id=project_id)
             project=await self.create_project(project)
