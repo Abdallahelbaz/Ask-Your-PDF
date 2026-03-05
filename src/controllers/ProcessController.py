@@ -15,7 +15,7 @@ class ProcessController(BaseController):
         super().__init__()
         self.project_id=project_id
         self.project_path= ProjectController().get_project_path(project_id=project_id)
-        self.SECTION_START_RE = re.compile(r"(?m)^\s*§\s*(\d+[a-z]?)\b")
+        
     
 
     def get_file_extenstion(self, file_id:str):

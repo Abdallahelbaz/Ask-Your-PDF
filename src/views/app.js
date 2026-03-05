@@ -23,7 +23,7 @@ const PROJECT_IDS = {
 
 // ==================== STATE ====================
 let isDarkMode = false;
-let currentProjectId = '3';
+let currentProjectId = '1';
 let currentChatId = null;
 let chats = [];
 let activeMenuId = null; // Track which chat menu is open
