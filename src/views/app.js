@@ -115,8 +115,9 @@ function toggleChatMenu(chatId, event, buttonElement) {
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         z-index: 1000;
-        min-width: 150px;
+        min-width: 60px;
         overflow: hidden;
+        width: 120px
     `;
     
     const chat = chats.find(c => c.id === chatId);

@@ -93,6 +93,26 @@ body {
     color: var(--upload-btn-hover-text);
 }
 
+.send-btn {
+    background: var(--upload-btn-bg);
+    border: 1px dashed var(--upload-btn-border);
+    color: var(--upload-btn-text);
+    padding: 10px 20px;
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.send-btn:hover {
+    background: var(--upload-btn-hover-bg);
+    color: var(--upload-btn-hover-text);
+    border: 1px dashed var(--upload-btn-hover-text);
+}
 .upload-btn {
     background: var(--upload-btn-bg);
     border: 1px dashed var(--upload-btn-border);
@@ -439,25 +459,6 @@ textarea::placeholder {
     color: var(--action-btn-hover-color);
 }
 
-.send-btn {
-    background: var(--send-btn-bg);
-    border: none;
-    color: rgb(177, 5, 5);
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 20px;
-}
-
-.send-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-}
 
 .send-btn:disabled {
     opacity: 0.5;
