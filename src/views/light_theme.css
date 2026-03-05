@@ -1,0 +1,46 @@
+:root {
+    --bg-gradient-start: #667eea;
+    --bg-gradient-end: #764ba2;
+    --container-bg: white;
+    --header-border: #eaeef2;
+    --text-primary: #2d3748;
+    --text-secondary: #718096;
+    --text-muted: #a0aec0;
+    --sidebar-bg: #f8fafd;
+    --sidebar-border: #eaeef2;
+    --document-bg: white;
+    --document-border: #eaeef2;
+    --document-hover-border: #667eea;
+    --document-active-bg: #f0f4ff;
+    --upload-btn-bg: #f7fafc;
+    --upload-btn-border: #667eea;
+    --upload-btn-text: #667eea;
+    --upload-btn-hover-bg: #667eea;
+    --upload-btn-hover-text: white;
+    --welcome-icon-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --suggested-question-bg: #f7fafc;
+    --suggested-question-border: #eaeef2;
+    --suggested-question-text: #4a5568;
+    --suggested-question-hover-bg: #667eea;
+    --suggested-question-hover-text: white;
+    --message-assistant-bg: #f7fafc;
+    --message-user-bg: #667eea;
+    --message-user-text: white;
+    --source-border: #eaeef2;
+    --source-tag-bg: white;
+    --source-tag-border: #eaeef2;
+    --source-tag-text: #4a5568;
+    --input-area-bg: white;
+    --input-container-bg: #f7fafc;
+    --input-container-border: #eaeef2;
+    --input-container-focus-border: #667eea;
+    --input-container-focus-shadow: rgba(102, 126, 234, 0.1);
+    --action-btn-color: #718096;
+    --action-btn-hover-bg: #eaeef2;
+    --action-btn-hover-color: #667eea;
+    --send-btn-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --scrollbar-track: #f1f1f1;
+    --scrollbar-thumb: #cbd5e0;
+    --scrollbar-thumb-hover: #a0aec0;
+}
+
