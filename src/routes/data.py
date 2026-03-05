@@ -12,11 +12,24 @@ from models.ChunkModel import ChunkModel
 from models.AssetModel import AssetModel
 from models.schemas import Chunk, Asset
 from models.enums.AssetTypeEnum import AssetTypeEnum
+from fastapi.middleware.cors import CORSMiddleware
 
 data_rounter= APIRouter(
     prefix="/api/v1/data", 
     tags=["api_v1","data"]
     )
+
+
+app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 log=logging.getLogger('uvicorn.error')
 

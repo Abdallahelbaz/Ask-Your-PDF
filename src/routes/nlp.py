@@ -7,12 +7,28 @@ from controllers import NLPController
 from models.enums.ResponseEnums import ResponseEnum
 from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
+from fastapi.middleware.cors import CORSMiddleware
+
 
 nlp_router= APIRouter(
     prefix="/api/v1/nlp", 
     tags=["api_v1","data"]
     )
     
+
+
+
+app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 log=logging.getLogger('uvicorn.error')
 
