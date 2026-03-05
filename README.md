@@ -44,3 +44,14 @@ set your environment variables in `.env` file like Your llm key.
 ```bash
 $ uvicorn main:app --reload --host 0.0.0.0 --port 5000
 ```
+
+
+
+## Run Frontend HTML Server
+```bash
+$ python3 -m http.server 8000
+```
+### it will run on:
+```bash
+$ http://localhost:8000/
+```

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask Your PDF - RAG App</title>
+    <link rel="stylesheet" href="styles.css">
+    <link id="theme-style" rel="stylesheet" href="dark_theme.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">📚</div>
+            <h1>Ask Your <span>PDF</span></h1>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar with Documents -->
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Recent Chats</div>
+                    <div class="document-item">
+                        <div class="doc-icon">💬</div>
+                        <div class="doc-info">
+                            <div class="doc-name">BGB §823 discussion</div>
+                            <div class="doc-meta">2 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="document-item">
+                        <div class="doc-icon">💬</div>
+                        <div class="doc-info">
+                            <div class="doc-name">Oral contracts validity</div>
+                            <div class="doc-meta">Yesterday</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <!-- Welcome Screen (shown initially) -->
+                <div class="welcome-container" id="welcomeScreen">
+                    <div class="welcome-icon">📄</div>
+                    <div class="welcome-title">Ask Your PDF</div>
+                    <div class="welcome-subtitle" id="welcomeSubtitle">
+                        Upload a document and start asking questions. 
+                        I'll help you find answers in your PDFs using RAG technology.
+                    </div>
+                    <div class="suggested-questions" id="suggestedQuestions">
+                        <div class="suggested-question" data-question="What is § 823 BGB?">What is § 823 BGB?</div>
+                        <div class="suggested-question" data-question="Are oral contracts valid?">Are oral contracts valid?</div>
+                        <div class="suggested-question" data-question="Liability for damages">Liability for damages</div>
+                        <div class="suggested-question" data-question="Right of withdrawal">Right of withdrawal</div>
+                    </div>
+                </div>
+
+                <!-- Chat Messages (hidden initially) -->
+                <div class="chat-messages" id="chatMessages"></div>
+
+                <!-- Loading Indicator -->
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <span>Searching through your documents...</span>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <div class="input-container">
+                        <textarea 
+                            id="userInput" 
+                            placeholder="Ask anything about your documents..." 
+                            rows="1"
+                        ></textarea>
+                        <div class="input-actions">
+                            <label class="upload-btn">
+                                <span>📄</span> Upload Document
+                                <input type="file" accept=".pdf" style="display: none;" multiple id="fileInput">
+                            </label>
+                            <button class="send-btn" id="sendBtn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
