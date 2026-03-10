@@ -1,15 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # Add this import
 from dotenv import load_dotenv
-
-load_dotenv(".env")
 from routes import base, data, nlp
-from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 from stores.llm.LLMFactory import LLMFactory
 from stores.vectordb.VectorDBFactory import VectorDBFactory
 from stores.llm.templates.templateLLM import TemplateLLM
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
+
+load_dotenv(".env")
 app = FastAPI()
 
 # ============ ADD CORS MIDDLEWARE HERE ============
@@ -25,8 +26,13 @@ app.add_middleware(
 async def startup_client():
     settings = get_settings()
 
-    app.mongo_connection = AsyncIOMotorClient(settings.MONGODB_URL)
-    app.mongo_client = app.mongo_connection[settings.MONGODB_DATABASE]
+    postgre_conn=f"postgresql+asyncpg://{settings.POSTGRES_USERNAME}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_MAIN_DB}"
+    app.db_engine=create_async_engine(postgre_conn)
+
+
+    app.db_client = sessionmaker(
+        app.db_engine, class_= AsyncSession, expire_on_commit=False
+    )
     factory = LLMFactory(settings)
 
     app.generation_client = factory.create(provider=settings.GENERATION_BACKEND)
@@ -48,9 +54,8 @@ async def startup_client():
 
 @app.on_event('shutdown')
 async def shutdown_client():
-    app.mongo_connection.close()
     app.vectordb_client.disconnect()
-
+    app.db_engine.dispose()
 app.include_router(base.base_router)
 app.include_router(data.data_rounter)
 app.include_router(nlp.nlp_router)
