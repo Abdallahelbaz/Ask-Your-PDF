@@ -180,7 +180,7 @@ class NLPController(BaseController):
             self.templateLLM.get(
                     "rag","document_prompt",{
                     "doc_num":ids+1,
-                    "chunk_text": doc.text
+                    "chunk_text": self.generation_client.process_text(doc.text)
                     }
                 )
             for ids, doc in enumerate(retrieved_doc)
