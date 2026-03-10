@@ -1,88 +1,62 @@
 from .BaseData import BaseData
 from .schemas import Chunk
 from .enums.DatabaseEnum import DatabaseEnum
-from bson.objectid import ObjectId
-from pymongo import InsertOne
 import logging
+from sqlalchemy.future import select
+from sqlalchemy import func, delete
+from bson import ObjectId
+
 
 class ChunkModel(BaseData):
     def __init__(self,client: object ):
         super().__init__(client)
-        self.collection= self.client[DatabaseEnum.COLLECTION_CHUNKS.value]
+        self.client= client
     
 
     @classmethod
     async def create_instance(cls, client: object):
         instance = cls(client)
-        await instance.init_collection()
         return instance
 
-    async def init_collection(self):
-        all_coll= await self.client.list_collection_names()
-        if DatabaseEnum.COLLECTION_CHUNKS.value not in all_coll:
-            self.collection= self.client[DatabaseEnum.COLLECTION_CHUNKS.value]
-            indexes= Chunk.get_indexes()
-            for index in indexes:
-                await self.collection.create_index(
-                    index["key"],
-                    name= index["name"],
-                    unique=index["unique"]
-                )
-
-
     async def create_chunk(self, chunk: Chunk):
-        # model_dump() to convert data to dict
-        inserted_chunk= self.collection.insert_one(chunk.model_dump(by_alias=True, exclude_unset=True))
-        chunk.id= inserted_chunk.inserted_id
-
-
+        async with self.client() as session:
+            async with session.begin():
+                session.add(chunk)
+            await session.commit()
+            await session.refresh(chunk)
         return chunk
+    
 
     async def get_chunk(self, chunk_id: str):
-        record= await self.collection.find_one({
-            "id": ObjectId(chunk_id)
-        })
-
-        if record is None: 
-            return None
-        
-        return Chunk(**record)
+        async with self.client() as session:
+            result=await session.excute(select(Chunk).where(Chunk.chunk_id==chunk_id))
+            chunk= result.scalar_one_or_none()
+        return chunk
+                           
 
 
     # if we have too many chunks, and we inserted it as a one batch, may it causes a problem with the data base
     # so insert them batch by batch
     async def insert_many(self, chunks: list, batch_size: int =100):
-
-        for i in range(0, len(chunks), batch_size):
-            batch= chunks [i: i + batch_size]
-
-            operations=[
-                InsertOne(chunk.model_dump(by_alias=True, exclude_unset=True))
-                for chunk in batch
-            ]
-            # it inserts the bulk(batch) i made, it's better than insert many
-            await self.collection.bulk_write(operations)
-        
+        async with self.client() as session:
+            async with session.begin():
+                for i in range(0, len(chunks), batch_size):
+                    batch= chunks[i:i+batch_size]
+                    session.add_all(batch)
+            await session.commit()        
         return len(chunks)
     
 
     async def delete_chunks_by_project_id(self, project_id: ObjectId):
-        result= await self.collection.delete_many({
-            "chunk_project_id": project_id
-        })
-
-        return result.deleted_count
+        async with self.client() as session:
+            result=await session.execute(delete(Chunk).where(Chunk.chunk_project_id==project_id))
+            await session.commit()
+        return result.rowcount
     
     async def get_project_chunks(self,project_id: ObjectId, page_no: int=1, page_size:int=50):
-        results=await self.collection.find(
-            {
-                "chunk_project_id":project_id
-            }
-        ).skip(
-            (page_no-1) * page_size
-        ).limit(page_size).to_list(length=None)
-
-        return [
-            Chunk(**r)
-            for r in results
-        ]
+        async with self.client() as session:
+            async with session.begin():
+                query= select(Chunk).where(Chunk.chunk_project_id==project_id).offset((page_no - 1 ) * page_size).limit(page_size)
+                result= await session.execute(query)
+                chunks=result.scalars().all()
+        return chunks
