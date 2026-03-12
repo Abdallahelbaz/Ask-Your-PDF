@@ -10,6 +10,7 @@ from collections import defaultdict
 from typing import List, Dict, Any
 from qdrant_client import models
 
+
 class NLPController(BaseController):
     
 
@@ -20,13 +21,14 @@ class NLPController(BaseController):
         self.embedding_client=embedding_client
         self.templateLLM=templateLLM
         self.log=logging.getLogger('uvicorn.error')
+        
 
     def create_collection_name(self, project_id:str):
         return f"collection_{project_id}".strip()
     
     async def reset_vectordb_collection(self, project:Project):
         collection_name= self.create_collection_name(project.project_id)
-        return self.vectordb_client.delete_collection(collection_name=collection_name)
+        return await self.vectordb_client.delete_collection(collection_name=collection_name)
 
 
 
@@ -46,10 +48,8 @@ class NLPController(BaseController):
         texts= [chunk.chunk_text for chunk in chunks]
         metadata= [data.chunk_metadata for data in chunks]
 
-        vectors=[
-            self.embedding_client.ebmed_text(text=text,document_type= DocumentTypeEnum.DOCUMENT.value)
-            for text in texts
-        ]
+        vectors= self.embedding_client.ebmed_text(text=texts,document_type= DocumentTypeEnum.DOCUMENT.value)
+            
         # 3 create collection if not exists
         await self.vectordb_client.create_collection(
             collection_name=collection_name,
@@ -69,32 +69,6 @@ class NLPController(BaseController):
 
         return True
 
-    
-    
-    # async def search_vectordb_collection(self,project:Project, text:str, limit: int=10):
-    #     # 1 get collectioin name
-    #     collection_name= self.create_collection_name(project.project_id)
-    #     # 2 get text embedding vector
-    #     vector = self.embedding_client.ebmed_text(
-    #         text=text,
-    #         document_type=DocumentTypeEnum.QUERY.value
-    #     )
-    #     if not vector or len(vector)==0:
-    #         return False
-
-    #     # 3 do semantic search
-    #     result=await self.vectordb_client.search_by_vector(collection_name=collection_name, vector=vector, limit=limit)
-
-    #     #         # it turns this string to json
-    #     # return json.loads(
-    #     #     # it turns the reslut into string
-    #     #     json.dumps(result,default= lambda x:x.__dict__)
-    #     # )
-
-    #     return result
-
-
-
     async def search_vectordb_collection(self, project: Project, text: str, limit: int = 10, 
                                         use_hybrid: bool = True, vector_weight: float = 0.7):
         """
@@ -108,18 +82,24 @@ class NLPController(BaseController):
             vector_weight: Weight for vector search in hybrid mode (0-1). 
                         BM25 weight will be (1 - vector_weight)
         """
+        query_vector=None
         # 1. Get collection name
         collection_name = self.create_collection_name(project.project_id)
         
         # 2. Get text embedding vector
-        vector = self.embedding_client.ebmed_text(
+        vectors = self.embedding_client.ebmed_text(
             text=text,
             document_type=DocumentTypeEnum.QUERY.value
         )
         
-        if not vector or len(vector) == 0:
+        if not vectors or len(vectors) == 0:
             return []
         
+        if isinstance(vectors, list) and len(vectors) >0:
+            query_vector=vectors[0]
+        
+        if not query_vector:
+            return False
         # 3. Perform search based on mode
         if use_hybrid:
             # Hybrid search (vector + BM25)
@@ -127,26 +107,23 @@ class NLPController(BaseController):
             result = await self.vectordb_client.hybrid_search(
                 collection_name=collection_name,
                 query=text,
-                vector=vector,
+                vector=query_vector,
                 vector_limit=limit * 2,  # Fetch more for reranking
-                bm25_limit=limit * 2,     # Fetch more for reranking
+                text_limit=limit * 2,     # Fetch more for reranking
                 final_limit=limit,
                 vector_weight=vector_weight
             )
         else:
             # Vector-only search
-            result = await self.vectordb_client.search_by_vector(
+            print("Vector-only search")
+            result = await self.vectordb_client.search_by_hybrid(
                 collection_name=collection_name,
-                vector=vector,
+                vector=query_vector,
                 limit=limit
             )
         
-        # Optional: Convert to JSON serializable format if needed
-        # return json.loads(json.dumps([r.__dict__ for r in result]))
-        
         return result
-
-
+    
 
 
     async def answer_rag_question(self,project:Project, text:str, limit: int=10):
@@ -157,24 +134,9 @@ class NLPController(BaseController):
             limit=limit
         )
 
-        # system_prompt=[
-        #     "",
-        #     ""
-        # ]
         system_prompt=self.templateLLM.get(
             "rag", "system_prompt"
         )
-
-        # docs_prompt=[]
-        # for ids, doc in enumerate(retrieved_doc):
-        #     docs_prompt.append(
-        #           self.templateLLM.get(
-        #             "rag","document_prompt",{
-        #             "doc_num":ids+1,
-        #             "chunk_text": doc.text
-        #             }
-        #         )
-        #     )
 
         docs_prompt='\n'.join([
             self.templateLLM.get(
