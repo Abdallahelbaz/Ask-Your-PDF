@@ -69,7 +69,7 @@ class QwenProvider(LLMInterface):
         return text[:self.default_input_max_chars].strip()
 
 
-    def ebmed_text(self, text: str, document_type: str= None):
+    def embed_text(self, text: str, document_type: str= None):
         if not self.client:
             self.log.error("Embedding Not set")
             return None
@@ -91,6 +91,6 @@ class QwenProvider(LLMInterface):
     def construct_prompt(self, prompt: str, role: str):
         return {
             "role": role,
-            "content": self.process_text(prompt)
+            "content": prompt
         }
         
