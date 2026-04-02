@@ -13,6 +13,7 @@ from models.AssetModel import AssetModel
 from models.schemas import Chunk, Asset
 from models.enums.AssetTypeEnum import AssetTypeEnum
 from fastapi.middleware.cors import CORSMiddleware
+from controllers import NLPController
 
 data_rounter= APIRouter(
     prefix="/api/v1/data", 
@@ -34,11 +35,11 @@ app.add_middleware(
 log=logging.getLogger('uvicorn.error')
 
 @data_rounter.post("/upload/{project_id}")
-async def upload_file(project_id: str, request: Request,
+async def upload_file(project_id: int, request: Request,
                        file: UploadFile,settings:Settings = Depends(get_settings)):
     
     project_model= await ProjectModel.create_instance(
-        request.app.mongo_client
+        request.app.db_client
     )
 
     project= await project_model.get_or_create_project(project_id=project_id)
@@ -74,11 +75,11 @@ async def upload_file(project_id: str, request: Request,
         )
     
     asset_model= await AssetModel.create_instance(
-         request.app.mongo_client
+         request.app.db_client
     )
 
     resource= Asset(
-         asset_project_id=project.id,
+         asset_project_id=project.project_id,
          asset_type=AssetTypeEnum.FILE.value,
          asset_name=file_id,
          asset_size= os.path.getsize(file_path),
@@ -89,47 +90,145 @@ async def upload_file(project_id: str, request: Request,
     return JSONResponse (
             content={
                 "Signal": ResponseEnum.FILE_UPLOADED_SUCCESSFULLY.value,
-                "file_id": str(asset_record.id),
+                "file_id": str(asset_record.asset_id),
 
             }
         )
 
+@data_rounter.post("/process_parent/{project_id}")
+async def data_processing_parent(project_id: int, process_request: ProcessRequest, request: Request):
+
+    # 1. Initialization
+    chunk_size = process_request.chunk_size
+    overlap_size = process_request.overlap_size
+    do_reset = process_request.do_reset
+
+    project_model = await ProjectModel.create_instance(request.app.db_client)
+    chunk_model = await ChunkModel.create_instance(request.app.db_client)
+    asset_model = await AssetModel.create_instance(request.app.db_client)
+    
+    project = await project_model.get_or_create_project(project_id=project_id)
+    
+    # 2. Get files to process
+    project_files_ids = {}
+    if process_request.file_id:
+        asset_record = await asset_model.get_asset_record(
+            asset_project_id=project.project_id,
+            asset_name=process_request.file_id
+        )
+        project_files_ids = {asset_record.asset_id: asset_record.asset_name}
+    else:
+        project_files = await asset_model.get_all_project_assets(
+            asset_project_id=project.project_id,
+            asset_type=AssetTypeEnum.FILE.value
+        )
+        project_files_ids = {record.asset_id: record.asset_name for record in project_files}
+    
+    if len(project_files_ids) == 0:
+        return JSONResponse(content={"Signal": ResponseEnum.NO_FILES_SIGNAL.value})
+    
+    process_controller = ProcessController(project_id=project_id)
+    
+    # 3. Reset logic
+    if do_reset == 1:
+        await chunk_model.delete_chunks_by_project_id(project_id=project.project_id)
+        # Note: If you have a vector collection to clear, add it here later
+
+    inserted_parents = 0
+    inserted_children = 0
+    no_files = 0
+    
+    # 4. Processing Loop
+    for asset_id, file_id in project_files_ids.items():
+        file_content = process_controller.get_file_content(file_id)
+
+        if file_content is None:
+            log.error(f"This File: {file_id} doesn't Exist!")
+            continue
+
+        # This should return (List[Parent_Objects], List[Child_Data_Dicts])
+        parent_objs, child_data_list = process_controller.process_file_content(
+            file_content=file_content,
+            asset_id=asset_id,
+            project_id=project.project_id,
+            chunk_size=chunk_size,
+            overlap_size=overlap_size
+        )
+
+        if not parent_objs:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"Signal": ResponseEnum.PROCESSING_FAILED.value}
+            )
+
+        # 5. Insert logic (Handles the SQL relationship between parent and child)
+        all_inserted_children = await chunk_model.insert_parent_child_chunks(
+            parent_chunks=parent_objs,
+            child_data_list=child_data_list
+        )
+        
+        inserted_parents += len(parent_objs)
+        inserted_children += len(all_inserted_children)
+        no_files += 1
+
+    return JSONResponse(
+        content={
+            "Signal": ResponseEnum.PROCESSING_SUCCESS.value,
+            "Inserted_Parents": inserted_parents,
+            "Inserted_Children": inserted_children,
+            "Total_Chunks": inserted_parents + inserted_children,
+            "No_files": no_files
+        }
+    )
+
+
+
+
 @data_rounter.post("/process/{project_id}")
-async def data_processing(project_id: str, process_request: ProcessRequest, request: Request):
+async def data_processing(project_id: int, process_request: ProcessRequest, request: Request):
 
     chunk_size= process_request.chunk_size
     overlap_size= process_request.overlap_size
     do_reset=process_request.do_reset
 
     project_model= await ProjectModel.create_instance(
-        request.app.mongo_client
+        request.app.db_client
     )
     chunk_model= await ChunkModel.create_instance(
-        request.app.mongo_client
+        request.app.db_client
     )
     project= await project_model.get_or_create_project(project_id=project_id)
     project_files_ids={}
     asset_model= await AssetModel.create_instance(
-        request.app.mongo_client
+        request.app.db_client
         )
+    nlp_controller=NLPController(
+        vectordb_client=request.app.vectordb_client,
+        generation_client=request.app.generation_client,
+        embedding_client=request.app.embedding_client,
+        templateLLM=request.app.templateLLM,
+        reranker=None,
+        expander=None
+         
+    )
     if process_request.file_id:
         asset_record= await asset_model.get_asset_record(
-             asset_project_id= project.id,
+             asset_project_id= project.project_id,
              asset_name=process_request.file_id
         )
         project_files_ids={
-             asset_record.id: asset_record.asset_name
+             asset_record.asset_id: asset_record.asset_name
         }
 
 
     else:
 
         project_files= await asset_model.get_all_project_assets(
-            asset_project_id= project.id,
+            asset_project_id= project.project_id,
             asset_type= AssetTypeEnum.FILE.value
         )
         project_files_ids={
-            record.id: record.asset_name
+            record.asset_id: record.asset_name
             for record in project_files
         }
     
@@ -140,14 +239,13 @@ async def data_processing(project_id: str, process_request: ProcessRequest, requ
 
             }
         )
-
-    
-
     process_controller= ProcessController(project_id=project_id)
     inserted_chunks=0
     no_files=0
     if do_reset==1:
-            _ =await chunk_model.delete_chunks_by_project_id(project_id=project.id)
+            collection_name=nlp_controller.create_collection_name(project.project_id)
+            _ =await chunk_model.delete_chunks_by_project_id(project_id=project.project_id)
+            await request.app.vectordb_client.delete_collection(collection_name)
 
     for asset_id, file_id in project_files_ids.items():
         
@@ -177,7 +275,7 @@ async def data_processing(project_id: str, process_request: ProcessRequest, requ
             chunk_text = chunk.page_content,
             chunk_metadata= chunk.metadata,
             chunk_order=i+1,
-            chunk_project_id= project.id,
+            chunk_project_id= project.project_id,
             chunk_asset_id=asset_id
             )
             for i, chunk in enumerate(file_chunks)
