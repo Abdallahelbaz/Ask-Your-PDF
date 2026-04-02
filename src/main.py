@@ -8,6 +8,7 @@ from stores.vectordb.VectorDBFactory import VectorDBFactory
 from stores.llm.templates.templateLLM import TemplateLLM
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sentence_transformers import CrossEncoder
 
 
 load_dotenv(".env")
@@ -35,6 +36,9 @@ async def startup_client():
     )
     factory = LLMFactory(settings)
 
+    app.expand_model=factory.create(provider=settings.GENERATION_BACKEND)
+    app.expand_model.set_generation_model(model_id=settings.EXPAND_MODEL_ID)
+
     app.generation_client = factory.create(provider=settings.GENERATION_BACKEND)
     app.generation_client.set_generation_model(model_id=settings.GENERATION_MODEL_ID)
 
@@ -44,18 +48,24 @@ async def startup_client():
         model_size=settings.EMBEDDING_MODEL_SIZE
     )
     
-    vectordb_factory = VectorDBFactory(settings)
+    vectordb_factory = VectorDBFactory(config=settings, db_client=app.db_client)
     app.vectordb_client = vectordb_factory.create(provider=settings.VECTOR_DB_BACKEND)
-    app.vectordb_client.connect()
+    await app.vectordb_client.connect()
     
     app.templateLLM = TemplateLLM(
         language=settings.DEFAULT_LANGUAGE
     )
+    app.reranker = CrossEncoder(
+            # 'cross-encoder/ms-marco-MiniLM-L-6-v2',  # Faster, smaller
+            'BAAI/bge-reranker-large',  # More accurate but slower
+            max_length=512,
+            device='cuda'  # Change to 'cuda' if GPU available
+        )
 
 @app.on_event('shutdown')
 async def shutdown_client():
     app.vectordb_client.disconnect()
-    app.db_engine.dispose()
+    await app.db_engine.dispose()
 app.include_router(base.base_router)
 app.include_router(data.data_rounter)
 app.include_router(nlp.nlp_router)
