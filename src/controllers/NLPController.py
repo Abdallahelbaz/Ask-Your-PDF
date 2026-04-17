@@ -1,5 +1,6 @@
 from .BaseController import BaseController
 from models.schemas import Project, Chunk
+from models.ChunkModel import ChunkModel
 from typing import List
 from stores.llm.LLMEnum import DocumentTypeEnum
 from models.schemas import RetrievedDocument
@@ -10,8 +11,6 @@ from langchain_core.documents import Document
 from collections import defaultdict
 from typing import List, Dict, Any
 from qdrant_client import models
-# from flashrank import Ranker, RerankRequest
-# from sentence_transformers import CrossEncoder
 
 
 class NLPController(BaseController):
@@ -96,101 +95,26 @@ class NLPController(BaseController):
         return True
 
 
-    async def index_into_vectordb(self, project:Project, chunks:List[Chunk], chunks_ids:List[int], do_reset:bool=False):
-        # 1 get Collection name
-        collection_name= self.create_collection_name(project.project_id)
-        # 2 manage items
-        texts= [chunk.chunk_text for chunk in chunks ]
-        metadata= [data.chunk_metadata for data in chunks]
-    
-        vectors= self.embedding_client.embed_text(text=texts,document_type= DocumentTypeEnum.DOCUMENT.value)
-
-       
-        # 3 create collection if not exists
-        await self.vectordb_client.create_collection(
-            collection_name=collection_name,
-            embedding_size=self.embedding_client.embedding_size,
-            do_reset=do_reset
-        )
-
-
-        # 4 insert into vectordb
-        inserted=await self.vectordb_client.insert_many(
-            collection_name=collection_name,
-            texts=texts,
-            metadata=metadata,
-            vectors=vectors,
-            record_ids=chunks_ids
-        )
-
-        return True
-
-
-
-
-    # async def index_into_vectordb(
-    #     self,
-    #     project: Project,
-    #     chunks: List[Chunk],
-    #     chunks_ids: List[int],
-    #     do_reset: bool = False):
-
-    #     collection_name = self.create_collection_name(project.project_id)
-
-    #     texts = []
-    #     metadata = []
-    #     valid_ids = []
-
-    #     for chunk, cid in zip(chunks, chunks_ids):
-
-    #         if chunk.chunk_text is None:
-    #             continue
-
-    #         text = chunk.chunk_text.strip()
-
-    #         if len(text) < 5:
-    #             continue
-
-    #         texts.append(text)
-    #         metadata.append(chunk.chunk_metadata)
-    #         valid_ids.append(cid)
-
-    #     # embeddings
-    #     vectors = self.embedding_client.embed_text(
-    #         text=texts,
-    #         document_type=DocumentTypeEnum.DOCUMENT.value
-    #     )
-
-    #     await self.vectordb_client.create_collection(
-    #         collection_name=collection_name,
-    #         embedding_size=self.embedding_client.embedding_size,
-    #         do_reset=do_reset
-    #     )
-
-    #     inserted = await self.vectordb_client.insert_many(
-    #         collection_name=collection_name,
-    #         texts=texts,
-    #         metadata=metadata,
-    #         vectors=vectors,
-    #         record_ids=valid_ids
-    #     )
-
-    #     return True
-    async def search_vectordb_collection_reranker(
+    async def search_vectordb_collection(
         self, 
         project: Project, 
         text: str, 
         limit: int = 10, 
-        use_hybrid: int = 1, 
+        use_hybrid: int =1, 
         vector_weight: float = 0.6,
-        reranker=None
+        reranker=None,
+        client=None
     ):
-
+        
+        # expanded_text=await self.expand_rag_query(text)
         query_vector = None
 
+        print(f"the query is: {text}")
         # 1. Get collection name
         collection_name = self.create_collection_name(project.project_id)
-
+        chunk_model= await ChunkModel.create_instance(
+        client=client
+        )
         # 2. Get query embedding
         vectors = self.embedding_client.embed_text(
             text=text,
@@ -208,6 +132,8 @@ class NLPController(BaseController):
         if not query_vector:
             return False
 
+
+
         # IMPORTANT: retrieve more candidates for reranking
         retrieval_k = 60
         print(f"retrieval_k: {retrieval_k}")
@@ -223,7 +149,7 @@ class NLPController(BaseController):
                 vector=query_vector,
                 vector_limit=limit * 2,  # Fetch more for reranking
                 bm25_limit=limit * 2,     # Fetch more for reranking
-                final_limit=limit,
+                final_limit=50,
             )
         elif use_hybrid==2:
             # Vector-only search
@@ -236,10 +162,10 @@ class NLPController(BaseController):
             results = await self.vectordb_client.search_by_bm25(
                 collection_name=collection_name,
                 query=text,
-                limit=limit
+                limit=50
             )
 
-        # 4. RERANK STEP
+        # # 4. RERANK STEP
         if results and len(results) > 0:
 
             pairs = [[text, r.text] for r in results]
@@ -250,178 +176,75 @@ class NLPController(BaseController):
                 r.rerank_score = float(score)
 
             results.sort(key=lambda x: x.rerank_score, reverse=True)
-
-        # 5. Return best results
-        return results[:limit]
-
-
-
-
-
-    async def search_vectordb_collection_ranker(self, project: Project, text: str, limit: int = 10, 
-                                        use_hybrid: bool = True, vector_weight: float = 0.9,
-                                        use_reranker: bool = True):
-        """
-        Search vector database with optional Hybrid Search and Reranking.
-        """
-        collection_name = self.create_collection_name(project.project_id)
+        #     print(len(results))
         
-        # 1. Get text embedding vector
-        vectors = self.embedding_client.embed_text(
-            text=text,
-            document_type=DocumentTypeEnum.QUERY.value
-        )
-        
-        if not vectors or len(vectors) == 0:
-            return []
-        
-        query_vector = vectors[0]
+        # return results[:limit]
 
-        # 2. Stage 1: Retrieval (Candidate Generation)
-        # If reranking, we fetch more candidates (e.g., 25) to find the "hidden gems"
-        retrieval_limit = limit * 14 if use_reranker else limit
-        print(f"retrieval_limit: {retrieval_limit}")
+        parents=[]
+        docs=[]
+        for parent in results[:limit]:
+            parent_id=parent.metadata.get('parent_id')
+            parent_chunk=await chunk_model.get_parent_chunk(parent_id, project.project_id)
+            parents.append(parent_chunk)
+            doc=RetrievedDocument(
+                        score=parent.score,
+                        text=parent_chunk.chunk_text,
+                        rerank_socre=parent.rerank_score,
+                        source="hybrid_rrf_qdrant",
+                    )
+            docs.append(doc)
 
-        if use_hybrid:
-            print(f"Performing Hybrid Search (Weight: {vector_weight})")
-            initial_results = await self.vectordb_client.hybrid_search(
-                collection_name=collection_name,
-                query=text,
-                vector=query_vector,
-                vector_limit=retrieval_limit,
-                bm25_limit=retrieval_limit,
-                final_limit=retrieval_limit,
-                vector_weight=vector_weight
-            )
-        else:
-            print("Performing Vector-only Search")
-            initial_results = await self.vectordb_client.search_by_vector(
-                collection_name=collection_name,
-                vector=query_vector,
-                limit=retrieval_limit
+        # return results[:limit]
+
+        return docs
+
+
+
+    async def answer_rag_question(self,project:Project, text:str, limit: int=10, client=None):
+            answer, full_prompt,chat_history=None,None,None
+
+            # expanded_text=await self.expand_rag_query(text)
+
+            retrieved_doc=await self.search_vectordb_collection(
+                project=project,
+                text=text,
+                limit=limit,
+                client=client
             )
 
-        if not initial_results:
-            return []
+            print(retrieved_doc)
+            system_prompt=self.templateLLM.get(
+                "rag", "system_prompt"
+            )
 
-        # 3. Stage 2: Reranking (Precision Refinement)
-        if use_reranker and hasattr(self, 'ranker'):
-            print(f"Reranking {len(initial_results)} candidates...")
-            
-            # Format candidates for FlashRank
-            passages = [
-                {"id": i, "text": doc.text, "meta": {"initial_score": doc.score}}
-                for i, doc in enumerate(initial_results)
-            ]
-            
-            rerank_request = RerankRequest(query=text, passages=passages)
-            reranked_results = self.ranker.rerank(rerank_request)
+            docs_prompt='\n'.join([
+                self.templateLLM.get(
+                        "rag","document_prompt",{
+                        "doc_num":ids+1,
+                        "chunk_text": doc.text
+                        }
+                    )
+                for ids, doc in enumerate(retrieved_doc)
+            ])
 
-            # Convert reranked results back to your Document format
-            return [
-                RetrievedDocument(
-                    text=r['text'],
-                    score=r['score'], # The new semantic relevance score
+            footer_prompt=self.templateLLM.get("rag","footer_prompt",{"query":text})
+
+            chat_history=[
+                self.generation_client.construct_prompt(
+                    prompt=system_prompt,
+                    role=self.generation_client.enums.SYSTEM.value
                 )
-                for r in reranked_results[:limit]
             ]
+            full_prompt= "\n\n".join([docs_prompt,footer_prompt ])
 
-        # If no reranker, return top 'limit' from initial results
-        return initial_results[:limit]
-
-
-
-    async def search_vectordb_collection(self, project: Project, text: str, limit: int = 10, 
-                                        use_hybrid: int=1):
-        
-        query_vector = None
-        # 1. Get collection name
-        collection_name = self.create_collection_name(project.project_id)
-        
-        # 2. Get text embedding vector
-        vectors = self.embedding_client.embed_text(
-            text=text,
-            document_type=DocumentTypeEnum.QUERY.value
-        )
-        print(f"vectors: {len(vectors[0])}")
-        
-        if not vectors or len(vectors) == 0:
-            return False
-        
-        if isinstance(vectors, list) and len(vectors) > 0:
-            query_vector = vectors[0]
-
-        if not query_vector:
-            return False
-        
-        # 3. Perform search based on mode
-        if use_hybrid==1:
-            # Hybrid search (vector + BM25)
-            print("use_hybrid")
-            result = await self.vectordb_client.hybrid_search(
-                collection_name=collection_name,
-                query=text,
-                vector=query_vector,
-                vector_limit=limit * 2,  # Fetch more for reranking
-                bm25_limit=limit * 2,     # Fetch more for reranking
-                final_limit=limit,
+            answer=self.generation_client.generate_text(
+                prompt=full_prompt,
+                chat_history=chat_history
             )
-        elif use_hybrid==2:
-            # Vector-only search
-            result = await self.vectordb_client.search_by_vector(
-                collection_name=collection_name,
-                vector=query_vector,
-                limit=limit
-            )
-        elif use_hybrid==3:
-            result = await self.vectordb_client.search_by_bm25(
-                collection_name=collection_name,
-                query=text,
-                limit=limit
-            )
-        
-        return result
-    
+
+            return footer_prompt , answer, full_prompt,chat_history
 
 
-    async def answer_rag_question(self,project:Project, text:str, limit: int=10):
-        answer, full_prompt,chat_history=None,None,None
-        retrieved_doc=await self.search_vectordb_collection(
-            project=project,
-            text=text,
-            limit=limit
-        )
-
-        system_prompt=self.templateLLM.get(
-            "rag", "system_prompt"
-        )
-
-        docs_prompt='\n'.join([
-            self.templateLLM.get(
-                    "rag","document_prompt",{
-                    "doc_num":ids+1,
-                    "chunk_text": self.generation_client.process_text(doc.text)
-                    }
-                )
-            for ids, doc in enumerate(retrieved_doc)
-        ])
-
-        footer_prompt=self.templateLLM.get("rag","footer_prompt",{"query":text})
-
-        chat_history=[
-            self.generation_client.construct_prompt(
-                prompt=system_prompt,
-                role=self.generation_client.enums.SYSTEM.value
-            )
-        ]
-        full_prompt= "\n\n".join([docs_prompt,footer_prompt ])
-
-        answer=self.generation_client.generate_text(
-             prompt=full_prompt,
-             chat_history=chat_history
-        )
-
-        return footer_prompt , answer, full_prompt,chat_history
 
 
 
@@ -429,17 +252,22 @@ class NLPController(BaseController):
         answer=None
         
         expand_prompt=self.templateLLM.get("rag","expand_prompt")
+        print(expand_prompt,"\n")
+
+        
+        print(expand_prompt)
         chat_history=[
             self.generation_client.construct_prompt(
                 prompt=expand_prompt,
                 role=self.generation_client.enums.SYSTEM.value
             )
         ]
-        answer=self.templateLLM.get("rag","expand_prompt",{"query":text})
 
+        answer=self.templateLLM.get("rag","answer",{"query":text})
+        print("\n",answer,'\n chat History: \n', chat_history)
         answer=self.expander.generate_text(
              prompt=answer,
              chat_history=chat_history
         )
-
+        print("\n",answer)
         return answer

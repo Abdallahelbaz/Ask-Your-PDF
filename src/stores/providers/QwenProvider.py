@@ -13,13 +13,13 @@ class QwenProvider(LLMInterface):
         self.api_url=api_url
         self.default_input_max_chars=default_input_max_chars
         self.default_max_output_tokens=default_max_output_tokens
-        self.temperature=temperature
+        self.temperature=0.0
         self.generation_model_id= None
         self.embedding_model_id= None
         self.embedding_size= None
         self.client= OpenAI(
             api_key=self.api_key,
-            base_url=self.api_url
+            # base_url=self.api_url
         )
         self.log= logging.getLogger(__name__)
         self.enums=OpenAIEnums

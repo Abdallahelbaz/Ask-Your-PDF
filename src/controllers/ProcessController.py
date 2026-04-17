@@ -46,334 +46,138 @@ class ProcessController(BaseController):
             return loader.load()
         return None
     
-
-
-
-
-    
     
 
 
-    def process_file_content_2(self, file_content: list, file_id: str,
-                            chunk_size: int=900, overlap_size: int=100):
-        file_content = self.remove_bgb_header(file_content)
-        text_splitter= RecursiveCharacterTextSplitter(
-            chunk_size= chunk_size,
-            chunk_overlap= overlap_size,
-            length_function= len,
-            keep_separator=True,
-            # separators=[
-            # "\n§ ",  # New section
-            # "\n\n",  # Paragraph breaks
-            # "\n",    # Line breaks
-            # ". ",    # Sentences
-            # " ",     # Words
-            # ]
-        )
+
+    def process_file_content_json(self, file_content: list, asset_id: int, project_id: int, chunk_size: int, overlap_size: int, file_id: str):
+        print('\n Hello From Process Json \n')
+        parent_chunks = []
+        child_chunks_nested = []
         
-        # text_splitter= CharacterTextSplitter(
-        #     separator="§",
-        #     chunk_size=chunk_size,
-        #     chunk_overlap=overlap_size,
-        #     length_function=len,
-        #     is_separator_regex=False,
-        # )
-        file_content_text=[
-            rec.page_content
-            for rec in file_content
-        ]
-        file_content_metadata=[
-            #{'page':rec.metadata.get('page')}
-            rec.metadata
-            for rec in file_content
-        ]
-
-        chunks= text_splitter.create_documents(
-            file_content_text,
-            metadatas=file_content_metadata,
-           
+        child_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=300, 
+            chunk_overlap=50
         )
-        return chunks
-    
-    
 
-    def split_absatz(self,text: str):
-
-        pattern = r'(\(\d+\))'
-
-        parts = re.split(pattern, text)
-
-        absatze = []
-
-        for i in range(1, len(parts), 2):
-            number = parts[i]
-            content = parts[i+1]
-            absatze.append(number + content)
-
-        return absatze
-
-
-    # def process_file_content(self, file_content: list, asset_id: int, project_id: int, chunk_size: int, overlap_size: int):
-    #     parent_chunks = []
-    #     child_data_list = []
-
-    #     child_splitter = RecursiveCharacterTextSplitter(
-    #         chunk_size=chunk_size, 
-    #         chunk_overlap=overlap_size
-    #     )
-
-    #     for rec in file_content:
-    #         try:
-    #             data = json.loads(rec.page_content)
-    #         except: continue
-
-    #         # Create Parent Object
-    #         parent_text = f"{data.get('full_section', '')}\n{data.get('text', '')}"
-    #         parent_obj = Chunk(
-    #             chunk_text=parent_text,
-    #             chunk_project_id=project_id,
-    #             chunk_asset_id=asset_id,
-    #             chunk_metadata={"law": data.get("law"), "section": data.get("section")},
-    #             chunk_order=0
-    #         )
-    #         parent_chunks.append(parent_obj)
-    #         text = data.get("text", "")
-
-    #         # Prepare Child Data (Wait for parent_id)
-    #         child_source = f"Keywords: {', '.join(data.get('keywords', []))}\n{data.get('text', '')}"
-
-    #         absatze = self.split_absatz(text)
-    #         full_section=data.get('full_section', '')
-    #         keywords=data.get('keywords', [])
-
-    #         if not absatze:
-    #             absatze = [text]
-
-    #         child_subtexts = []
-
-    #         for absatz in absatze:
-
-    #             absatz_content = f"{full_section}\n{absatz}"
-    #             # absatz_content = f"{full_section}\n{absatz}\nKeywords: {', '.join(keywords)}"
-    #             # # if absatz small → keep
-    #             # if len(absatz_content) <= chunk_size:
-
-    #             child_subtexts.append(absatz_content)
-
-    #             # else:
-    #             #     splits = recursive_splitter.split_text(absatz_content)
-    #             #     child_subtexts.extend(splits)
-            
-    #         child_data_list.append({
-    #             "sub_texts": child_subtexts,
-    #             "metadata": {
-    #                 "law": data.get("law"), 
-    #                 "section": data.get("section"), 
-    #                 "keywords": data.get("keywords", [])
-    #             }
-    #         })
-
-    #     return parent_chunks, child_data_list
-
-
-
-    def process_file_content(self, file_content: list, file_id: str,
-                         chunk_size: int=900, overlap_size: int=100):
-        docs = []
         for rec in file_content:
             try:
-                data = json.loads(rec.page_content)  # parse the JSON string
-            except json.JSONDecodeError:
-            # skip invalid JSON lines
-                 continue
-            # If page_content is a dict (JSON)
+                data = json.loads(rec.page_content)
+            except: 
+                continue
+
+            full_section = data.get('full_section', '')
+            text = data.get("text", "")
             
-            paragraph = data.get("paragraph", "").strip()
-            print(paragraph)
-            titel=data.get("titel","").strip()
-            text = data.get("text", "").strip()
-            questions = data.get("questions", "").strip()
-
-            content = f"{paragraph}\n{titel}\n{text}\n{questions}" if text else None
-            # If page_content is a string (TXT or PDF)
-            if not content:
-                continue
-
-            docs.append(
-                Document(
-                    page_content=content,
-                    metadata={
-                        "paragraph": paragraph,
-                        "file_id": file_id,
-                        "key_words":titel
-                    }
-                )
+            # Create Parent Object
+            parent_text = f"{full_section}\n{text}"
+            parent_obj = Chunk(
+                chunk_text=parent_text,
+                chunk_project_id=project_id,
+                chunk_asset_id=asset_id,
+                chunk_metadata={"paragraph": full_section},
+                chunk_order=0
             )
+            parent_chunks.append(parent_obj)
 
-        return docs
+            # 2. Handle Splitting Logic
+            if len(text) > 300:
+                # Recursive split (tries to stay under 500)
+                raw_docs = child_splitter.split_text(text)
+                
+                # 3. Merge Logic to enforce MINIMUM 250
+                refined_docs = []
+                for chunk in raw_docs:
+                    if refined_docs and len(chunk) < 200:
+                        # Append small chunk to the previous one
+                        refined_docs[-1] = f"{refined_docs[-1]} {chunk}".strip()
+                    else:
+                        refined_docs.append(chunk)
+                
+                # Final check: if the very last chunk is still < 250 and we have more than one chunk
+                if len(refined_docs) > 1 and len(refined_docs[-1]) < 200:
+                    last_chunk = refined_docs.pop()
+                    refined_docs[-1] = f"{refined_docs[-1]} {last_chunk}".strip()
+            else:
+                refined_docs = [text]
 
-
-    def process_file_content_ID_1(self, file_content: list, file_id: str,
-                         chunk_size: int=900, overlap_size: int=100):
-        docs = []
-        for rec in file_content:
-            try:
-                data = json.loads(rec.page_content)  # parse the JSON string
-            except json.JSONDecodeError:
-            # skip invalid JSON lines
-                 continue
-            # If page_content is a dict (JSON)
+            # 4. Create Child Objects
+            current_parent_children = []
+            for i, absatz in enumerate(refined_docs):
+                absatz_content = f"{full_section}\n{absatz}"
+                child_obj = Chunk(
+                    chunk_text=absatz_content,
+                    chunk_project_id=project_id,
+                    chunk_asset_id=asset_id,
+                    chunk_metadata={"paragraph": full_section},
+                    chunk_order=i  # Using i to maintain sequence
+                )
+                current_parent_children.append(child_obj)
             
-            paragraph = data.get("full_section", "").strip()
-            print(paragraph)
+            child_chunks_nested.append(current_parent_children)
 
-            text = data.get("text", "").strip()
-            print(text)
-            keywords = data.get("keywords", [])
-            print(keywords)
-            content = f"{paragraph}\n{text}\n{keywords}" if text else None
-            # If page_content is a string (TXT or PDF)
-            if not content:
-                continue
+        return child_chunks_nested, parent_chunks
 
-            docs.append(
-                Document(
-                    page_content=content,
-                    metadata={
-                        "paragraph": paragraph,
-                        "file_id": file_id,
-                        "key_words":keywords
-                    }
-                )
-            )
 
-        return docs
 
-    def process_file_content_ID_2(self, file_content: list, file_id: str,
-                         chunk_size: int=900, overlap_size: int=100):
-        docs = []
-        for rec in file_content:
-            try:
-                data = json.loads(rec.page_content)  # parse the JSON string
-            except json.JSONDecodeError:
-            # skip invalid JSON lines
-                 continue
-            # If page_content is a dict (JSON)
-            paragraph = data.get("paragraph", "").strip()
-            print(paragraph)
-            text = data.get("text", "").strip()
-            print(text)
-            content = f"{paragraph}\n{text}" if text else None
-            # If page_content is a string (TXT or PDF)
-            if not content:
-                continue
-            docs.append(
-                Document(
-                    page_content=content,
-                    metadata=rec.metadata
-                )
-            )
-
-        return docs
-    
-    def process_file_content_ID_3(self, file_content: list, file_id: str,
-                            chunk_size: int=1000, overlap_size: int=100):
+    def process_file_content_pdf(self, file_content: list, file_id: str,
+                         chunk_size: int=1000, overlap_size: int=5, 
+                         project_id=None, asset_id=str):
+        print('\n Hello From Process pdf \n')
+        # 1. Pre-process (Header removal and Regex cleaning)
         file_content = self.remove_bgb_header(file_content)
-        text_splitter= RecursiveCharacterTextSplitter(
-            chunk_size= chunk_size,
-            chunk_overlap= overlap_size,
-            length_function= len,
-        )
-        file_content_text=[
-            rec.page_content
-            for rec in file_content
-        ]
-        file_content_metadata=[
-            #{'page':rec.metadata.get('page')}
-            rec.metadata
-            for rec in file_content
-        ]
+        cleaned_string = self.clean_text(file_content) 
 
-        chunks= text_splitter.create_documents(
-            file_content_text,
-            metadatas=file_content_metadata,
-        )
-        return chunks
+        # 2. Wrap into Document object
+        cleaned_docs = [Document(page_content=cleaned_string, metadata={"file_id": file_id})]
 
+        # Define Splitters
+        parent_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=0)
+        child_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
 
-    def process_file_content_ID_4(self, file_content: list, file_id: str,
-                             chunk_size: int = 500, overlap_size: int = 50):
-
-        file_content = self.remove_bgb_header(file_content)
-        full_text = " ".join([rec.page_content for rec in file_content])
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=overlap_size,
-            length_function=len,
+        # Create Parent Documents
+        parent_docs = parent_splitter.create_documents(
+            [rec.page_content for rec in cleaned_docs],
+            metadatas=[rec.metadata for rec in cleaned_docs]
         )
 
-        docs = []
+        final_parents = []
+        final_children = []
 
-        for rec in file_content:
+        # 2. For each parent, generate its specific children
+        for p_idx, p_doc in enumerate(parent_docs):
+            parent_obj = Chunk(
+                chunk_text=p_doc.page_content,
+                chunk_metadata={"type": "parent", "file_id": file_id, "metadata": p_doc.metadata},
+                chunk_order=p_idx,
+                chunk_project_id=project_id,
+                chunk_asset_id=asset_id
+            )
+            final_parents.append(parent_obj)
 
-            text = rec.page_content
-            metadata = rec.metadata
+            # 3. Split Parent into children
+            child_docs = child_splitter.create_documents([p_doc.page_content])
+            
+            parent_children_data = []
+            for c_idx, c_doc in enumerate(child_docs):
 
-            # Split by paragraph (§)
-            sections = re.split(r'(§\s*\d+\s+[^\n]+)', text)
-
-            for i in range(1, len(sections), 2):
-                paragraph_title = sections[i].strip()
-                paragraph_text = sections[i+1].strip()
-
-                full_text = f"{paragraph_title}\n{paragraph_text}"
-
-                # Now apply recursive splitter
-                sub_chunks = text_splitter.split_text(full_text)
-
-                for chunk in sub_chunks:
-                    docs.append(
-                        Document(
-                            page_content=chunk,
-                            metadata={
-                                **metadata,
-                                "paragraph": paragraph_title,
-                                "file_id": file_id
-                            }
-                        )
+                # Only keep the child if it's 300 characters or more
+                if len(c_doc.page_content) >= 200:
+                    child_data = Chunk(
+                        chunk_text=c_doc.page_content,
+                        chunk_metadata={"type": "child", "file_id": file_id, "metadata": p_doc.metadata},
+                        chunk_order=c_idx,
+                        chunk_project_id=project_id,
+                        chunk_asset_id=asset_id
                     )
+                    parent_children_data.append(child_data)
+                else:
+                    pass
+            
+            # Only add to final_children if the parent actually produced valid children
+            final_children.append(parent_children_data)
 
-        return docs
-    
-    def process_file_content_ID_5(self, file_content: list, file_id: str,
-                            chunk_size: int=1000, overlap_size: int=100):
-        file_content = self.remove_bgb_header(file_content)
-        text_splitter= CharacterTextSplitter(
-            separator="§",
-            chunk_size=chunk_size,
-            chunk_overlap=overlap_size,
-            length_function=len,
-            is_separator_regex=False,
-        )
-        file_content_text=[
-            rec.page_content
-            for rec in file_content
-        ]
-        file_content_metadata=[
-            #{'page':rec.metadata.get('page')}
-            rec.metadata
-            for rec in file_content
-        ]
-
-        chunks= text_splitter.create_documents(
-            file_content_text,
-            metadatas=file_content_metadata,
-           
-        )
-        return chunks
-
-
-
+        return final_children, final_parents
 
 
 
@@ -448,3 +252,20 @@ class ProcessController(BaseController):
                 cleaned_content.append(doc)
         
         return cleaned_content
+
+
+    def clean_text(self, raw_text):
+        # 1. Check if it's a list of LangChain Document objects
+        if isinstance(raw_text, list):
+            try:
+                # Extract 'page_content' from each Document object
+                raw_text = "\n".join([doc.page_content for doc in raw_text])
+            except AttributeError:
+                # Fallback if it's just a list of strings
+                raw_text = "\n".join([str(item) for item in raw_text])
+        
+        # 2. Perform the cleaning regex
+        text = re.sub(r'\n\s*\n', '\n', raw_text)
+        text = re.sub(r'[ \t]+', ' ', text)
+        
+        return text.strip()

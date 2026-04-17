@@ -14,9 +14,6 @@ class ProjectModel(BaseData):
         self.client= client
     
 
-    # init_collection is a async method, so we should call it with await, 
-    # we can't call async method in __init__ 
-    # so we make this method to call __init__ and init_collection
     @classmethod
     async def create_instance(cls, client: object):
         instance= cls(client)
