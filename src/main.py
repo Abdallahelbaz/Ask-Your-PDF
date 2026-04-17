@@ -14,13 +14,13 @@ from sentence_transformers import CrossEncoder
 load_dotenv(".env")
 app = FastAPI()
 
-# ============ ADD CORS MIDDLEWARE HERE ============
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development only! Allows all origins
+    allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, OPTIONS, etc.)
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"], 
+    allow_headers=["*"],  
 )
 
 @app.on_event('startup')
@@ -56,10 +56,9 @@ async def startup_client():
         language=settings.DEFAULT_LANGUAGE
     )
     app.reranker = CrossEncoder(
-            # 'cross-encoder/ms-marco-MiniLM-L-6-v2',  # Faster, smaller
-            'BAAI/bge-reranker-large',  # More accurate but slower
+            'BAAI/bge-reranker-large',  
             max_length=512,
-            device='cuda'  # Change to 'cuda' if GPU available
+            device='cuda'  
         )
 
 @app.on_event('shutdown')

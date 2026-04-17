@@ -9,7 +9,7 @@ from models.ProjectModel import ProjectModel
 from models.ChunkModel import ChunkModel
 from fastapi.middleware.cors import CORSMiddleware
 from tqdm.auto import tqdm
-
+from models.schemas import RetrievedDocument
 
 nlp_router= APIRouter(
     prefix="/api/v1/nlp", 
@@ -21,10 +21,9 @@ nlp_router= APIRouter(
 
 app = FastAPI()
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your frontend URL
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -152,6 +151,7 @@ async def search_index(request:Request, project_id:int, search_request: SearchRe
     project= await project_model.get_or_create_project(
         project_id=project_id
     )
+    
     reranker =request.app.reranker
     nlp_controller=NLPController(
         vectordb_client=request.app.vectordb_client,
@@ -159,46 +159,16 @@ async def search_index(request:Request, project_id:int, search_request: SearchRe
         generation_client=request.app.generation_client,
         templateLLM=request.app.templateLLM,
         reranker=reranker,
-        expander=None
+        expander=request.app.generation_client
     )
     results=await nlp_controller.search_vectordb_collection(
         project=project,
         text=search_request.text,
         limit=search_request.limit,
-    )
-
-    return JSONResponse(
-            content={
-                "signal": ResponseEnum.VECTORDB_SEARCH_INFO.value,
-                "results": [ result.dict() for result in results]
-                }
-            )
-
-
-
-@nlp_router.post("/index/search/{project_id}")
-async def search_index_base(request:Request, project_id:int, search_request: SearchRequest):
-
-    project_model= await ProjectModel.create_instance(
         client=request.app.db_client
     )
-    project= await project_model.get_or_create_project(
-        project_id=project_id
-    )
-    
-    nlp_controller=NLPController(
-        vectordb_client=request.app.vectordb_client,
-        embedding_client= request.app.embedding_client,
-        generation_client=request.app.generation_client,
-        templateLLM=request.app.templateLLM,
-        reranker=None,
-        expander=None
-    )
-    results=await nlp_controller.search_vectordb_collection(
-        project=project,
-        text=search_request.text,
-        limit=search_request.limit,
-    )
+
+    print(type(results))
 
     return JSONResponse(
             content={
@@ -206,6 +176,7 @@ async def search_index_base(request:Request, project_id:int, search_request: Sea
                 "results": [ result.dict() for result in results]
                 }
             )
+
 
 
 @nlp_router.post("/index/answer/{project_id}")
@@ -223,13 +194,13 @@ async def answer_rag(request:Request, project_id:int, search_request: SearchRequ
         generation_client=request.app.generation_client,
         templateLLM=request.app.templateLLM,
         reranker=reranker,
-        expander=None
-
+        expander=request.app.generation_client
     )
     query, answer, full_prompt, chat_history=await nlp_controller.answer_rag_question(
         project=project,
         text=search_request.text,
-        limit=search_request.limit
+        limit=search_request.limit,
+        client=request.app.db_client
     )
 
     return JSONResponse(
@@ -251,7 +222,7 @@ async def expand_query(request:Request, project_id:int, search_request: SearchRe
         generation_client=request.app.generation_client,
         templateLLM=request.app.templateLLM,
         reranker=reranker, 
-        expander=request.app.expand_model
+        expander=request.app.generation_client
 
     )
     answer=await nlp_controller.expand_rag_query(
