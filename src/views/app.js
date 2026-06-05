@@ -18,7 +18,7 @@ const CHATS_STORAGE_KEY = 'rag_app_chats_list';
 
 // Project ID mapping
 const PROJECT_IDS = {
-    'bgb': '3',
+    'bgb': '4',
 };
 
 // ==================== STATE ====================

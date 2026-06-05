@@ -1,3 +1,1 @@
-from .Project import Project
-from .Chunk import Chunk,RetrievedDocument
-from .Asset import Asset
+from models.schemas.askyourpdf.schemas import Project, Asset, Chunk,RetrievedDocument

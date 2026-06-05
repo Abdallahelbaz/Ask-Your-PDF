@@ -16,5 +16,28 @@ services:
         # if it fails, then restart
         restart: always
 
+    pgvector:
+        image: pgvector/pgvector:pg17-trixie
+        container_name: pgvector
+        ports:
+        - "5432:5432"
+        volumes:
+        - pgvector_data:/var/lib/postgresql/data
+        environment:
+        - POSTGRES_PASSWORD=300922
+        networks:
+        - backend
+        restart: always
+        # healthcheck:
+        # test: ["CMD-SHELL", "pg_isready -U postgres"]
+        # interval: 5s
+        # timeout: 5s
+        # retries: 5
+        # start_period: 10s
+
 networks:
-    backend:z
+    backend:
+
+volumes:
+    pgvector_data:
+        

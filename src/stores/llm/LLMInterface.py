@@ -16,7 +16,7 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
-    def ebmed_text(self, text: str, document_type: str= None):
+    def embed_text(self, text: str, document_type: str= None):
         pass
 
 

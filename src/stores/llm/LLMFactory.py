@@ -12,7 +12,7 @@ class LLMFactory:
         if provider == LLMEnum.QWEN.value:
             return QwenProvider(
                 api_key= self.config.QWEN_API_KEY,
-                 api_url= self.config.QWEN_URL, 
+                api_url= self.config.QWEN_URL, 
                     default_input_max_chars=self.config.INPUT_DEFAULT_MAX_CHARS,
                     default_max_output_tokens=self.config.GENERATION_DEFAULT_MAX_TOKENS,
                     temperature= self.config.GENERATION_DEFAULT_TEMPERATURE

@@ -6,6 +6,13 @@ This repository contains the implementation of a Retrieval-Augmented Generation 
 
 - Python 3.10 or later
 
+#### Install Dependencies
+
+```bash
+sudo apt update
+sudo apt install libpq-dev gcc python3-dev
+```
+
 #### Install Python using MiniConda
 
 1) Download and install MiniConda from [here] ( https://www.anaconda.com/docs/getting-started/miniconda/main#quick-command-line-install )

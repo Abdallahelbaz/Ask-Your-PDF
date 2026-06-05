@@ -4,3 +4,4 @@ class ProcessingEnums(Enum):
 
     TXT=".txt"
     PDF=".pdf"
+    JSON=".json"
